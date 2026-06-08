@@ -1,3 +1,4 @@
+import json
 import logging
 import traceback
 from typing import Any, Dict, List, Optional
@@ -138,28 +139,79 @@ def register_recipe_tools(mcp: FastMCP, mealie: MealieFetcher) -> None:
 
     @mcp.tool()
     def create_recipe(
-        name: str, ingredients: List[str], instructions: List[str]
+        name: str,
+        ingredients: List[str],
+        instructions: List[str],
+        description: Optional[str] = None,
+        category: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        servings: Optional[str] = None,
+        prep_time: Optional[str] = None,
+        cook_time: Optional[str] = None,
+        total_time: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Create a new recipe
+        """Create a new recipe using Mealie's importer so ingredients are parsed properly.
 
         Args:
-            name: The name of the new recipe to be created.
-            ingredients: A list of ingredients for the recipe include quantities and units.
-            instructions: A list of instructions for preparing the recipe.
+            name: The name of the new recipe.
+            ingredients: Ingredient lines with quantities and units.
+            instructions: Step-by-step cooking instructions.
+            description: Optional recipe description.
+            category: Optional recipe category.
+            tags: Optional recipe tags.
+            servings: Optional yield/servings text.
+            prep_time: Optional ISO 8601 duration, e.g. PT10M.
+            cook_time: Optional ISO 8601 duration, e.g. PT20M.
+            total_time: Optional ISO 8601 duration, e.g. PT30M.
 
         Returns:
             Dict[str, Any]: The created recipe details.
         """
         try:
-            logger.info({"message": "Creating recipe", "name": name})
-            slug = mealie.create_recipe(name)
-            recipe_json = mealie.get_recipe(slug)
-            recipe = Recipe.model_validate(recipe_json)
-            recipe.recipeIngredient = [RecipeIngredient(note=i) for i in ingredients]
-            recipe.recipeInstructions = [
-                RecipeInstruction(text=i) for i in instructions
-            ]
-            return mealie.update_recipe(slug, recipe.model_dump(exclude_none=True))
+            logger.info({"message": "Creating recipe through importer", "name": name})
+
+            schema_recipe: Dict[str, Any] = {
+                "@context": "https://schema.org",
+                "@type": "Recipe",
+                "name": name,
+                "recipeIngredient": ingredients,
+                "recipeInstructions": [
+                    {"@type": "HowToStep", "text": instruction}
+                    for instruction in instructions
+                ],
+            }
+
+            if description is not None:
+                schema_recipe["description"] = description
+
+            if category is not None:
+                schema_recipe["recipeCategory"] = [category]
+
+            if tags:
+                schema_recipe["keywords"] = ", ".join(tags)
+
+            if servings is not None:
+                schema_recipe["recipeYield"] = servings
+
+            if prep_time is not None:
+                schema_recipe["prepTime"] = prep_time
+
+            if cook_time is not None:
+                schema_recipe["cookTime"] = cook_time
+
+            if total_time is not None:
+                schema_recipe["totalTime"] = total_time
+
+            payload: Dict[str, Any] = {
+                "includeTags": True,
+                "includeCategories": True,
+                "data": json.dumps(schema_recipe),
+                "url": None,
+            }
+
+            slug = mealie.create_recipe_from_html_or_json(payload)
+            return mealie.get_recipe(slug)
+
         except Exception as e:
             error_msg = f"Error creating recipe '{name}': {str(e)}"
             logger.error({"message": error_msg})
