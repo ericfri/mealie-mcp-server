@@ -115,6 +115,22 @@ class RecipeMixin:
         logger.info({"message": "Creating new recipe", "name": name})
         return self._handle_request("POST", "/api/recipes", json={"name": name})
 
+    def create_recipe_from_html_or_json(self, payload: Dict[str, Any]) -> str:
+        """Create a recipe using Mealie's HTML/schema.org JSON importer.
+
+        Args:
+            payload: Import payload with includeTags, includeCategories, data, and optional url.
+
+        Returns:
+            Slug of the newly created recipe.
+        """
+        logger.info({"message": "Creating recipe from html-or-json importer"})
+        return self._handle_request(
+            "POST",
+            "/api/recipes/create/html-or-json",
+            json=payload,
+        )
+        
     def patch_recipe(self, slug: str, recipe_data: Dict[str, Any]) -> Dict[str, Any]:
         """Partially update a recipe (only updates provided fields)
 
