@@ -210,7 +210,17 @@ def register_recipe_tools(mcp: FastMCP, mealie: MealieFetcher) -> None:
             }
 
             slug = mealie.create_recipe_from_html_or_json(payload)
-            return mealie.get_recipe(slug)
+
+            recipe_json = mealie.get_recipe(slug)
+            recipe = Recipe.model_validate(recipe_json)
+
+            parsed_ingredients = mealie.parse_ingredients(ingredients)
+            recipe.recipeIngredient = [
+                RecipeIngredient.model_validate(parsed["ingredient"])
+                for parsed in parsed_ingredients
+            ]
+
+            return mealie.update_recipe(slug, recipe.model_dump(exclude_none=True))
 
         except Exception as e:
             error_msg = f"Error creating recipe '{name}': {str(e)}"
@@ -240,7 +250,11 @@ def register_recipe_tools(mcp: FastMCP, mealie: MealieFetcher) -> None:
             logger.info({"message": "Updating recipe", "slug": slug})
             recipe_json = mealie.get_recipe(slug)
             recipe = Recipe.model_validate(recipe_json)
-            recipe.recipeIngredient = [RecipeIngredient(note=i) for i in ingredients]
+            parsed_ingredients = mealie.parse_ingredients(ingredients)
+            recipe.recipeIngredient = [
+                RecipeIngredient.model_validate(parsed["ingredient"])
+                for parsed in parsed_ingredients
+            ]
             recipe.recipeInstructions = [
                 RecipeInstruction(text=i) for i in instructions
             ]
