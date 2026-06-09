@@ -131,6 +131,21 @@ class RecipeMixin:
             json=payload,
         )
         
+    def parse_ingredients(self, ingredients: List[str]) -> List[Dict[str, Any]]:
+        """Parse ingredient strings into Mealie RecipeIngredient objects."""
+        if not ingredients:
+            return []
+
+        logger.info({"message": "Parsing recipe ingredients", "count": len(ingredients)})
+        return self._handle_request(
+            "POST",
+            "/api/parser/ingredients",
+            json={
+                "parser": "nlp",
+                "ingredients": ingredients,
+            },
+        )
+
     def patch_recipe(self, slug: str, recipe_data: Dict[str, Any]) -> Dict[str, Any]:
         """Partially update a recipe (only updates provided fields)
 
